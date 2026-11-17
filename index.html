@@ -1,1 +1,177 @@
 
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SpendWise | Personal Finance</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f4f6f8;color:#202b3c;font-family:Arial,sans-serif}
+header{background:#172b4d;color:white;padding:24px 6%}
+header h1{margin:0;font-size:28px}
+header p{color:#cbd5e1;margin-bottom:0}
+main{max-width:1050px;margin:28px auto;padding:0 18px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:15px}
+.card,.panel{background:white;border-radius:14px;padding:20px;box-shadow:0 2px 12px #1522380d}
+.card small{color:#718096}
+.card h2{margin:12px 0 0;font-size:25px}
+.green{color:#16865a}.red{color:#d64b4b}
+.layout{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:20px}
+h3{margin-top:0}
+input,select,button{width:100%;padding:12px;margin:6px 0;border:1px solid #dce2e9;border-radius:8px;font-size:15px}
+button{background:#2563eb;color:white;border:0;font-weight:bold;cursor:pointer}
+button:hover{background:#1d4ed8}
+table{width:100%;border-collapse:collapse;margin-top:12px}
+td,th{text-align:left;padding:12px 7px;border-bottom:1px solid #edf0f4;font-size:14px}
+th{color:#718096}
+.delete{background:#fee2e2;color:#b91c1c;padding:7px}
+.bar{height:12px;background:#e7edf5;border-radius:10px;overflow:hidden;margin-top:12px}
+.fill{height:100%;background:#2563eb}
+footer{text-align:center;padding:30px;color:#718096}
+@media(max-width:650px){.layout{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+<h1>💰 SpendWise</h1>
+<p>Understand your money. Manage your future.</p>
+</header>
+<main>
+<div class="cards">
+<div class="card"><small>Total Balance</small><h2 id="balance">₹0</h2></div>
+<div class="card"><small>Total Income</small><h2 class="green" id="income">₹0</h2></div>
+<div class="card"><small>Total Expenses</small><h2 class="red" id="expenses">₹0</h2></div>
+</div>
+
+<div class="layout">
+<section class="panel">
+<h3>➕ Add Transaction</h3>
+<form id="form">
+<input id="description" placeholder="Description (e.g. Groceries)" required>
+<input id="amount" type="number" min="0.01" step="0.01" placeholder="Amount (₹)" required>
+<select id="type">
+<option value="expense">Expense</option>
+<option value="income">Income</option>
+</select>
+<select id="category">
+<option>Food</option><option>Shopping</option>
+<option>Travel</option><option>Bills</option>
+<option>Health</option><option>Education</option>
+<option>Salary</option><option>Other</option>
+</select>
+<input id="date" type="date" required>
+<button type="submit">Add Transaction</button>
+</form>
+</section>
+
+<section class="panel">
+<h3>🎯 Monthly Budget</h3>
+<p>Set your monthly spending limit.</p>
+<input id="budget" type="number" min="0" placeholder="Budget in ₹">
+<button id="saveBudget">Save Budget</button>
+<h2 id="budgetText">₹0 / ₹0</h2>
+<div class="bar"><div class="fill" id="progress"></div></div>
+<p id="budgetMessage">Set a budget to get started.</p>
+</section>
+</div>
+
+<section class="panel" style="margin-top:20px">
+<h3>📊 Transactions</h3>
+<button id="export" style="width:auto">Export CSV</button>
+<div style="overflow-x:auto">
+<table>
+<thead><tr><th>Description</th><th>Category</th><th>Date</th><th>Amount</th><th></th></tr></thead>
+<tbody id="transactions"></tbody>
+</table>
+</div>
+</section>
+</main>
+<footer>SpendWise · Free and Open Source · Made for better money habits</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+let items = JSON.parse(localStorage.getItem("spendwise-items") || "[]");
+let budget = Number(localStorage.getItem("spendwise-budget") || 0);
+$("date").value = new Date().toISOString().slice(0,10);
+$("budget").value = budget;
+
+function money(n){
+ return "₹" + n.toLocaleString("en-IN",{maximumFractionDigits:2});
+}
+function save(){
+ localStorage.setItem("spendwise-items",JSON.stringify(items));
+ render();
+}
+function render(){
+ const income = items.filter(x=>x.type==="income").reduce((s,x)=>s+x.amount,0);
+ const expenses = items.filter(x=>x.type==="expense").reduce((s,x)=>s+x.amount,0);
+ $("income").textContent=money(income);
+ $("expenses").textContent=money(expenses);
+ $("balance").textContent=money(income-expenses);
+
+ $("transactions").innerHTML="";
+ [...items].reverse().forEach(x=>{
+  const tr=document.createElement("tr");
+  [x.description,x.category,x.date].forEach(v=>{
+   const td=document.createElement("td");
+   td.textContent=v;
+   tr.appendChild(td);
+  });
+  const amount=document.createElement("td");
+  amount.textContent=(x.type==="income"?"+":"-")+money(x.amount);
+  amount.style.color=x.type==="income"?"green":"#d64b4b";
+  tr.appendChild(amount);
+  const action=document.createElement("td");
+  const btn=document.createElement("button");
+  btn.textContent="Delete";
+  btn.className="delete";
+  btn.onclick=()=>{items=items.filter(y=>y.id!==x.id);save()};
+  action.appendChild(btn);
+  tr.appendChild(action);
+  $("transactions").appendChild(tr);
+ });
+ const now=new Date();
+ const monthly=items.filter(x=>x.type==="expense" &&
+  x.date.slice(0,7)===now.toISOString().slice(0,7))
+  .reduce((s,x)=>s+x.amount,0);
+ $("budgetText").textContent=money(monthly)+" / "+money(budget);
+ $("progress").style.width=Math.min(budget?monthly/budget*100:0,100)+"%";
+ $("budgetMessage").textContent=budget?
+  (monthly>budget?"Budget exceeded!": "You have "+money(budget-monthly)+" remaining.") :
+  "Set a budget to get started.";
+}
+$("form").onsubmit=e=>{
+ e.preventDefault();
+ items.push({
+  id:crypto.randomUUID(),
+  description:$("description").value.trim(),
+  amount:Number($("amount").value),
+  type:$("type").value,
+  category:$("category").value,
+  date:$("date").value
+ });
+ $("form").reset();
+ $("date").value=new Date().toISOString().slice(0,10);
+ save();
+};
+$("saveBudget").onclick=()=>{
+ budget=Math.max(0,Number($("budget").value)||0);
+ localStorage.setItem("spendwise-budget",budget);
+ render();
+};
+$("export").onclick=()=>{
+ const rows=[["Description","Amount","Type","Category","Date"],
+ ...items.map(x=>[x.description,x.amount,x.type,x.category,x.date])];
+ const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")).join("\n");
+ const a=document.createElement("a");
+ a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+ a.download="spendwise-transactions.csv";
+ a.click();
+ URL.revokeObjectURL(a.href);
+};
+render();
+</script>
+</body>
+</html>
